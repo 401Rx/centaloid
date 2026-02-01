@@ -120,7 +120,7 @@ def main():
 # ---------------------------------------------------------------------------
 
 def main_gui():
-    """Launch the Tkinter GUI."""
+    """Launch the browser-based GUI."""
     _setup_logging(verbose=False)
     from .gui import CentaloidApp
     app = CentaloidApp()
