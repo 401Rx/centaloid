@@ -2,10 +2,21 @@
 
 from __future__ import annotations
 
+import os
 import argparse
 import logging
 import sys
 from pathlib import Path
+
+# Force matplotlib to use a non-interactive backend before anything imports
+# it.  On some macOS versions the default "macosx" backend crashes with
+# "macOS XX or later required".  Agg is a safe headless rasterizer.
+os.environ.setdefault("MPLBACKEND", "Agg")
+try:
+    import matplotlib
+    matplotlib.use("Agg", force=True)
+except ImportError:
+    pass
 
 from . import __version__
 

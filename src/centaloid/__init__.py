@@ -10,4 +10,10 @@ Computes the Centiloid value from amyloid PET DICOM series by:
    scale using published tracer-specific linear equations.
 """
 
+import os as _os
+
+# Prevent matplotlib macOS backend crash ("macOS XX or later required")
+# by defaulting to the headless Agg renderer before any import.
+_os.environ.setdefault("MPLBACKEND", "Agg")
+
 __version__ = "1.0.0"
