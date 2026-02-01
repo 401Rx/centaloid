@@ -1,0 +1,5 @@
+[console_scripts]
+centaloid = centaloid.main:main
+
+[gui_scripts]
+centaloid-gui = centaloid.main:main_gui
