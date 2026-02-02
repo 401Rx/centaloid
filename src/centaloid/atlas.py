@@ -67,8 +67,11 @@ class Ellipsoid:
 
 
 # Approximate ellipsoidal fits
-CTX_ELLIPSOID = Ellipsoid(cx=0, cy=0, cz=15, rx=60, ry=65, rz=55)
-CEREBELLUM_ELLIPSOID = Ellipsoid(cx=0, cy=-60, cz=-40, rx=55, ry=25, rz=22)
+CTX_ELLIPSOID = Ellipsoid(cx=0, cy=-5, cz=20, rx=55, ry=60, rz=50)
+# Cerebellum ellipsoid fitted to the MNI-152 cerebellar grey matter.
+# Using the ellipsoid alone (without the bounding box) avoids sampling
+# non-brain voxels in the posterior fossa.
+CEREBELLUM_ELLIPSOID = Ellipsoid(cx=0, cy=-58, cz=-35, rx=48, ry=18, rz=14)
 
 
 # ---------------------------------------------------------------------------
@@ -128,11 +131,18 @@ def generate_cerebellum_mask(
     affine: np.ndarray,
     use_ellipsoid: bool = True,
 ) -> np.ndarray:
-    """Generate the whole-cerebellum (WC) reference ROI mask."""
+    """Generate the whole-cerebellum (WC) reference ROI mask.
+
+    Uses the cerebellar ellipsoid directly rather than intersecting with
+    the bounding box.  The bounding box extended well beyond the brain
+    boundary in the posterior fossa, causing ~50 % of voxels to sample
+    non-brain signal and deflating the reference mean.
+    """
     coords = _voxel_to_mni(shape, affine)
-    mask = _bbox_mask(coords, CEREBELLUM_WC)
     if use_ellipsoid:
-        mask &= _ellipsoid_mask(coords, CEREBELLUM_ELLIPSOID)
+        mask = _ellipsoid_mask(coords, CEREBELLUM_ELLIPSOID)
+    else:
+        mask = _bbox_mask(coords, CEREBELLUM_WC)
     return mask.reshape(shape)
 
 
