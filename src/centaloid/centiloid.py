@@ -185,9 +185,23 @@ def compute_suvr(
 
     voxel_vol_cc = abs(np.linalg.det(affine[:3, :3])) / 1000.0  # mm³→mL
 
+    # Threshold to exclude near-zero voxels that arise from resampling
+    # padding (cval=0).  A voxel is considered background if its value
+    # is below 1 % of the volume's robust maximum (99th percentile of
+    # positive voxels).  This prevents boundary zeros from deflating
+    # the reference-region mean and inflating SUVr / Centiloid.
+    positive = volume[volume > 0]
+    if positive.size > 0:
+        robust_max = np.percentile(positive, 99)
+        bg_threshold = robust_max * 0.01
+    else:
+        bg_threshold = 0.0
+
     region_results: dict[str, RegionResult] = {}
     for key, mask in masks.items():
         vals = volume[mask]
+        # Exclude resampling-artifact zeros / near-zeros
+        vals = vals[vals > bg_threshold]
         n = int(vals.size)
         region_results[key] = RegionResult(
             name=key,
