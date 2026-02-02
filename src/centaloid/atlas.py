@@ -67,8 +67,8 @@ class Ellipsoid:
 
 
 # Approximate ellipsoidal fits
-CTX_ELLIPSOID = Ellipsoid(cx=0, cy=-5, cz=20, rx=55, ry=60, rz=50)
-CEREBELLUM_ELLIPSOID = Ellipsoid(cx=0, cy=-60, cz=-38, rx=52, ry=22, rz=18)
+CTX_ELLIPSOID = Ellipsoid(cx=0, cy=0, cz=15, rx=60, ry=65, rz=55)
+CEREBELLUM_ELLIPSOID = Ellipsoid(cx=0, cy=-60, cz=-40, rx=55, ry=25, rz=22)
 
 
 # ---------------------------------------------------------------------------
