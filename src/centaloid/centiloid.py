@@ -168,6 +168,7 @@ def classify_centiloid(cl: float) -> str:
 def compute_suvr(
     volume: np.ndarray,
     affine: np.ndarray,
+    background_threshold: float = 0.01,
 ) -> tuple[float, float, float, dict[str, RegionResult]]:
     """Compute SUVr = mean(CTX) / mean(WC) and per-region stats.
 
@@ -175,6 +176,10 @@ def compute_suvr(
     ----------
     volume : (Z, Y, X) ndarray  – PET data in MNI space.
     affine : (4, 4) – MNI affine.
+    background_threshold : float
+        Voxels with values below this fraction of the volume's non-zero mean
+        are excluded from ROI statistics. This removes resampling artifacts
+        (cval=0 padding) from the computation. Default 0.01 (1%).
 
     Returns
     -------
@@ -185,15 +190,25 @@ def compute_suvr(
 
     voxel_vol_cc = abs(np.linalg.det(affine[:3, :3])) / 1000.0  # mm³→mL
 
+    # Compute threshold to exclude resampling padding (cval=0) artifacts
+    # Use a fraction of the mean of non-zero voxels as the cutoff
+    nonzero_vals = volume[volume > 0]
+    if nonzero_vals.size > 0:
+        min_threshold = background_threshold * nonzero_vals.mean()
+    else:
+        min_threshold = 0.0
+
     region_results: dict[str, RegionResult] = {}
     for key, mask in masks.items():
         vals = volume[mask]
-        n = int(vals.size)
+        # Exclude near-zero voxels (resampling artifacts)
+        valid_vals = vals[vals > min_threshold]
+        n = int(valid_vals.size)
         region_results[key] = RegionResult(
             name=key,
             label=REGION_LABELS.get(key, key),
-            mean_uptake=float(vals.mean()) if n > 0 else 0.0,
-            std_uptake=float(vals.std()) if n > 0 else 0.0,
+            mean_uptake=float(valid_vals.mean()) if n > 0 else 0.0,
+            std_uptake=float(valid_vals.std()) if n > 0 else 0.0,
             voxel_count=n,
             volume_cc=n * voxel_vol_cc,
         )

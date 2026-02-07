@@ -12,6 +12,7 @@ an external tool (e.g. ``antsRegistrationSyNQuick``).
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Optional
 
 import numpy as np
@@ -22,27 +23,60 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# MNI-152 template stub (2 mm resolution, 91×109×91)
+# MNI-152 template (2 mm resolution, 91×109×91)
 # ---------------------------------------------------------------------------
 
 MNI_SHAPE = (91, 109, 91)
 MNI_VOXEL_SIZE = (2.0, 2.0, 2.0)
 
-# Standard MNI affine (2 mm, RAS, origin at AC)
+# Standard MNI affine (2 mm, origin at AC) - matches included template
 MNI_AFFINE = np.array([
-    [2.0,  0.0,  0.0, -90.0],
-    [0.0,  2.0,  0.0, -126.0],
-    [0.0,  0.0,  2.0, -72.0],
-    [0.0,  0.0,  0.0,   1.0],
+    [-2.0,  0.0,  0.0,  90.0],
+    [ 0.0,  2.0,  0.0, -126.0],
+    [ 0.0,  0.0,  2.0,  -72.0],
+    [ 0.0,  0.0,  0.0,    1.0],
 ])
+
+# Path to MNI template file
+_DATA_DIR = Path(__file__).parent / "data"
+_MNI_TEMPLATE_PATH = _DATA_DIR / "mni152_t1_2mm.nii.gz"
+
+# Cached template
+_MNI_TEMPLATE: Optional[np.ndarray] = None
+
+
+def _load_mni_template() -> np.ndarray:
+    """Load the MNI-152 T1 template for registration.
+
+    Returns the actual MNI-152 T1 template if available, otherwise falls
+    back to a synthetic ellipsoidal approximation.
+    """
+    global _MNI_TEMPLATE
+
+    if _MNI_TEMPLATE is not None:
+        return _MNI_TEMPLATE
+
+    if _MNI_TEMPLATE_PATH.exists():
+        try:
+            import nibabel as nib
+            img = nib.load(_MNI_TEMPLATE_PATH)
+            _MNI_TEMPLATE = np.asarray(img.dataobj, dtype=np.float64)
+            logger.info("Loaded MNI-152 template: %s", _MNI_TEMPLATE_PATH.name)
+            return _MNI_TEMPLATE
+        except Exception as e:
+            logger.warning("Failed to load MNI template: %s", e)
+
+    # Fallback to synthetic template
+    logger.warning("Using synthetic MNI template (real template not found)")
+    _MNI_TEMPLATE = _synthetic_mni_template()
+    return _MNI_TEMPLATE
 
 
 def _synthetic_mni_template() -> np.ndarray:
     """Create an approximate MNI brain-shaped template for registration.
 
-    This produces a smooth ellipsoidal "brain" in MNI space that is
-    sufficient for gross affine alignment of PET data.  Real applications
-    should load the actual MNI-152 PET template.
+    This produces a smooth ellipsoidal "brain" in MNI space as a fallback
+    when the real MNI-152 template is not available.
     """
     kk, jj, ii = np.mgrid[0:MNI_SHAPE[0], 0:MNI_SHAPE[1], 0:MNI_SHAPE[2]]
     ijk1 = np.column_stack([kk.ravel(), jj.ravel(), ii.ravel(),
@@ -128,7 +162,7 @@ def estimate_affine_to_mni(
     transform : (4, 4) ndarray
         Maps **source voxel** indices to **MNI voxel** indices.
     """
-    template = _synthetic_mni_template()
+    template = _load_mni_template()
     source_smooth = gaussian_filter(source_data.astype(np.float64), sigma=2)
 
     # Normalise intensities

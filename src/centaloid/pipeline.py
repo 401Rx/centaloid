@@ -137,7 +137,7 @@ def run_pipeline(
     # 4. Determine tracer -----------------------------------------------------
     tracer = config.tracer_name or pet.info.tracer_name
     if not tracer or tracer.lower() == "unknown":
-        tracer = "Florbetapir"  # default fallback
+        tracer = "Florbetaben"  # default fallback
         logger.warning("Could not detect tracer – defaulting to %s", tracer)
 
     # 5. Centiloid computation ------------------------------------------------
