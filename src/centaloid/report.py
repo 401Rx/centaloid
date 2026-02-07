@@ -7,6 +7,7 @@ from typing import Optional
 
 from .centiloid import CentiloidResult, RegionResult
 from .dicom_loader import DicomSeriesInfo
+from .atlas import get_voi_status, is_using_official_voi
 
 
 # ---------------------------------------------------------------------------
@@ -54,6 +55,7 @@ def render_text_report(
     lines.append(f"  SUVr (CTX/WC)  : {result.suvr:.4f}")
     lines.append(f"  Centiloid (CL) : {result.centiloid:.1f}")
     lines.append(f"  Classification : {result.classification}")
+    lines.append(f"  VOI Masks      : {get_voi_status()}")
     lines.append("")
 
     if result.confidence_note:
@@ -139,6 +141,16 @@ def render_html_report(
     warning_html = ""
     if result.confidence_note:
         warning_html = f'<div class="warning">{result.confidence_note}</div>'
+
+    voi_status = get_voi_status()
+    if not is_using_official_voi():
+        warning_html += (
+            '<div class="warning">'
+            '<strong>VOI Warning:</strong> Using procedural fallback masks. '
+            'For accurate clinical results, download official GAAIN VOI files from: '
+            '<a href="https://www.gaain.org/centiloid-project">gaain.org/centiloid-project</a>'
+            '</div>'
+        )
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -267,6 +279,7 @@ def render_html_report(
 
     <div class="footer">
         <p>Centiloid scale: 0 = young-control mean, 100 = typical-AD mean</p>
+        <p>VOI Masks: {voi_status}</p>
         <p>Reference: Klunk WE et al. <em>Alzheimers Dement</em> 2015;11(1):1-15</p>
     </div>
 </div>
