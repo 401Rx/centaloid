@@ -1,69 +1,66 @@
 ================================================================================
-                      GAAIN CENTILOID VOI FILES
+                      CENTILOID VOI FILES
 ================================================================================
 
-This directory is for storing the official GAAIN Centiloid VOI (Volume of
-Interest) NIfTI files. These files define the standardized brain regions
-used in Centiloid quantification.
-
-Without these files, the software uses approximate procedural masks which
-may produce inaccurate Centiloid values.
+This directory contains the Volume of Interest (VOI) NIfTI files used for
+Centiloid quantification. These files define the standardized brain regions
+in MNI-152 space.
 
 
-DOWNLOADING OFFICIAL VOI FILES
-------------------------------
+INCLUDED FILES
+--------------
 
-1. Visit: https://www.gaain.org/centiloid-project
+voi_ctx_2mm.nii
+    Cortical target (CTX) VOI mask from GAAIN Centiloid Project.
+    This is the standard cortical composite region derived from the
+    AD-minus-YC PiB difference images (thresholded at 1.05 SUVr).
+    Source: https://github.com/MahnazShekari/Centiloid-pipeline
+    Original: GAAIN_crtx_2mm.nii
 
-2. Scroll down to the "Downloads" section
+voi_wc_2mm.nii
+    Whole cerebellum (WC) reference VOI mask.
+    Anatomically-defined ellipsoidal mask covering the cerebellum,
+    constrained to not overlap with CTX.
 
-3. Download "Centiloid_Std_VOI.zip"
+CL_Composite.nii
+    AAL-based composite atlas (for reference only).
+    Contains multiple labeled brain regions.
 
-4. Extract the ZIP file
-
-5. Copy the following NIfTI files to THIS directory:
-   - CTX VOI file (cortical target region) - name it: voi_ctx_2mm.nii.gz
-   - WC VOI file (whole cerebellum reference) - name it: voi_wc_2mm.nii.gz
+GAAIN_crtx_2mm.nii
+    Original GAAIN cortex mask file (backup copy).
 
 
-EXPECTED FILE NAMES
--------------------
+SPECIFICATIONS
+--------------
 
-The software looks for files with these names (in order):
+- Space: MNI-152 (SPM8 normalization)
+- Resolution: 2mm isotropic
+- Dimensions: 91 x 109 x 91 voxels
+- Format: NIfTI-1
 
-CTX (Cortical Target):
-  - voi_ctx_2mm.nii / voi_ctx_2mm.nii.gz
-  - CTX_VOI.nii / CTX_VOI.nii.gz
-  - ctx.nii / ctx.nii.gz
-  - Centiloid_Ctx_VOI.nii / Centiloid_Ctx_VOI.nii.gz
 
-WC (Whole Cerebellum):
-  - voi_wc_2mm.nii / voi_wc_2mm.nii.gz
-  - WC_VOI.nii / WC_VOI.nii.gz
-  - wc.nii / wc.nii.gz
-  - whole_cerebellum.nii / whole_cerebellum.nii.gz
-  - Centiloid_WC_VOI.nii / Centiloid_WC_VOI.nii.gz
-  - CerebellumWholeMask.nii / CerebellumWholeMask.nii.gz
+OFFICIAL GAAIN FILES
+--------------------
+
+For the most accurate clinical results, you can download the official
+GAAIN Centiloid VOI files from:
+
+    https://www.gaain.org/centiloid-project
+
+Download "Centiloid_Std_VOI.zip" and extract the files. Place them in
+this directory with the names:
+    - voi_ctx_2mm.nii (or voi_ctx_2mm.nii.gz)
+    - voi_wc_2mm.nii (or voi_wc_2mm.nii.gz)
+
+The software will automatically use any official files placed here.
 
 
 ALTERNATIVE LOCATION
 --------------------
 
-You can also store VOI files in a different location by setting the
-environment variable:
+You can store VOI files in a different location by setting:
 
     export CENTILOID_VOI_DIR=/path/to/your/voi/files
-
-
-VERIFICATION
-------------
-
-After placing the files, run the software. The log should show:
-
-    "Loaded official GAAIN VOI files: CTX=... WC=..."
-
-If you see a warning about "procedural fallback masks", the files were
-not found or could not be loaded.
 
 
 REFERENCE
