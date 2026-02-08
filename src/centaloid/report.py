@@ -252,14 +252,6 @@ def render_html_report(
                 <div class="suvr-val">{result.suvr:.4f}</div>
                 <div class="suvr-lbl">SUVr (CTX / WC)</div>
             </div>
-            <div class="suvr-item">
-                <div class="suvr-val">{result.ctx_mean:.4f}</div>
-                <div class="suvr-lbl">CTX Mean</div>
-            </div>
-            <div class="suvr-item">
-                <div class="suvr-val">{result.ref_mean:.4f}</div>
-                <div class="suvr-lbl">WC Ref Mean</div>
-            </div>
         </div>
     </div>
 

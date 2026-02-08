@@ -295,18 +295,6 @@ def create_dicom_structured_report(
         code_value="126400", code_scheme="DCM"
     ))
 
-    # Add CTX mean
-    content_sequence.append(_create_num_measurement(
-        "Cortical Target Mean", "SUV", result.ctx_mean,
-        code_value="126402", code_scheme="DCM"
-    ))
-
-    # Add Reference mean
-    content_sequence.append(_create_num_measurement(
-        "Reference Region Mean", "SUV", result.ref_mean,
-        code_value="126403", code_scheme="DCM"
-    ))
-
     # Add tracer name as text
     content_sequence.append(_create_text_content(
         "Tracer", result.tracer,
