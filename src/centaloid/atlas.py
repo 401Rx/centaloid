@@ -353,6 +353,9 @@ REGION_LABELS: dict[str, str] = {
     "cerebellum_wc": "Whole Cerebellum (WC)",
 }
 
+# Reference regions used for SUVr normalization.
+REFERENCE_REGION_KEYS: tuple[str, ...] = ("cerebellum_wc",)
+
 
 def generate_subregion_masks(
     shape: tuple[int, int, int],

@@ -31,6 +31,7 @@ except ImportError:
     PIL_AVAILABLE = False
 
 from .centiloid import CentiloidResult
+from .atlas import REFERENCE_REGION_KEYS
 from .dicom_loader import DicomSeriesInfo
 
 logger = logging.getLogger(__name__)
@@ -172,12 +173,20 @@ def create_dicom_secondary_capture(
 
     # Add Centiloid-specific private tags or use Content Sequence
     # Using standard tags where possible
-    ds.ImageComments = (
-        f"Centiloid={result.centiloid:.1f} CL, "
-        f"SUVr={result.suvr:.4f}, "
-        f"Tracer={result.tracer}, "
-        f"Classification={result.classification}"
+    reference_suvr = ", ".join(
+        f"{region.label} SUVr={region.suvr:.4f}"
+        for region in result.regions
+        if region.name in REFERENCE_REGION_KEYS
     )
+    comment_parts = [
+        f"Centiloid={result.centiloid:.1f} CL",
+        f"SUVr={result.suvr:.4f}",
+        f"Tracer={result.tracer}",
+        f"Classification={result.classification}",
+    ]
+    if reference_suvr:
+        comment_parts.append(f"Reference SUVr: {reference_suvr}")
+    ds.ImageComments = ", ".join(comment_parts)
 
     # Save the file
     if output_path is None:
@@ -294,6 +303,15 @@ def create_dicom_structured_report(
         "SUVr (CTX/WC)", "ratio", result.suvr,
         code_value="126400", code_scheme="DCM"
     ))
+
+    # Add reference region SUVr values
+    for region in result.regions:
+        if region.name not in REFERENCE_REGION_KEYS:
+            continue
+        content_sequence.append(_create_num_measurement(
+            f"SUVr ({region.label})", "ratio", region.suvr,
+            code_value="126400", code_scheme="DCM"
+        ))
 
     # Add tracer name as text
     content_sequence.append(_create_text_content(
@@ -441,9 +459,13 @@ def _render_result_image(
     y += 25
 
     for region in result.regions:
-        draw.text((40, y), f"{region.label}: mean={region.mean_uptake:.4f}, "
-                  f"voxels={region.voxel_count}, vol={region.volume_cc:.1f}mL",
-                  font=body_font, fill='black')
+        details = (
+            f"{region.label}: mean={region.mean_uptake:.4f}, "
+            f"voxels={region.voxel_count}, vol={region.volume_cc:.1f}mL"
+        )
+        if region.name in REFERENCE_REGION_KEYS:
+            details += f", SUVr={region.suvr:.4f}"
+        draw.text((40, y), details, font=body_font, fill='black')
         y += 18
 
     y += 20

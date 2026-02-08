@@ -126,6 +126,7 @@ class RegionResult:
     label: str
     mean_uptake: float
     std_uptake: float
+    suvr: float
     voxel_count: int
     volume_cc: float  # mL
 
@@ -198,29 +199,43 @@ def compute_suvr(
     else:
         min_threshold = 0.0
 
-    region_results: dict[str, RegionResult] = {}
+    region_stats: dict[str, tuple[str, float, float, int, float]] = {}
     for key, mask in masks.items():
         vals = volume[mask]
         # Exclude near-zero voxels (resampling artifacts)
         valid_vals = vals[vals > min_threshold]
         n = int(valid_vals.size)
-        region_results[key] = RegionResult(
-            name=key,
-            label=REGION_LABELS.get(key, key),
-            mean_uptake=float(valid_vals.mean()) if n > 0 else 0.0,
-            std_uptake=float(valid_vals.std()) if n > 0 else 0.0,
-            voxel_count=n,
-            volume_cc=n * voxel_vol_cc,
+        mean_uptake = float(valid_vals.mean()) if n > 0 else 0.0
+        std_uptake = float(valid_vals.std()) if n > 0 else 0.0
+        region_stats[key] = (
+            REGION_LABELS.get(key, key),
+            mean_uptake,
+            std_uptake,
+            n,
+            n * voxel_vol_cc,
         )
 
-    ctx_mean = region_results["ctx_composite"].mean_uptake
-    ref_mean = region_results["cerebellum_wc"].mean_uptake
+    ctx_mean = region_stats["ctx_composite"][1]
+    ref_mean = region_stats["cerebellum_wc"][1]
 
     if ref_mean <= 0:
         logger.warning("Reference region mean is ≤ 0 – SUVr will be invalid.")
         suvr = 0.0
     else:
         suvr = ctx_mean / ref_mean
+
+    region_results: dict[str, RegionResult] = {}
+    for key, (label, mean_uptake, std_uptake, n, volume_cc) in region_stats.items():
+        region_suvr = mean_uptake / ref_mean if ref_mean > 0 else 0.0
+        region_results[key] = RegionResult(
+            name=key,
+            label=label,
+            mean_uptake=mean_uptake,
+            std_uptake=std_uptake,
+            suvr=region_suvr,
+            voxel_count=n,
+            volume_cc=volume_cc,
+        )
 
     return suvr, ctx_mean, ref_mean, region_results
 

@@ -65,12 +65,12 @@ def render_text_report(
     lines.append("-" * w)
     lines.append("  REGIONAL UPTAKE VALUES")
     lines.append("-" * w)
-    lines.append(f"  {'Region':<32} {'Mean':>8} {'SD':>8} {'Voxels':>8} {'Vol(mL)':>8}")
-    lines.append(f"  {'-'*32} {'-'*8} {'-'*8} {'-'*8} {'-'*8}")
+    lines.append(f"  {'Region':<32} {'SUVr':>6} {'Mean':>8} {'SD':>8} {'Voxels':>8} {'Vol(mL)':>8}")
+    lines.append(f"  {'-'*32} {'-'*6} {'-'*8} {'-'*8} {'-'*8} {'-'*8}")
     for r in result.regions:
         lines.append(
-            f"  {r.label:<32} {r.mean_uptake:>8.4f} {r.std_uptake:>8.4f} "
-            f"{r.voxel_count:>8d} {r.volume_cc:>8.1f}"
+            f"  {r.label:<32} {r.suvr:>6.3f} {r.mean_uptake:>8.4f} "
+            f"{r.std_uptake:>8.4f} {r.voxel_count:>8d} {r.volume_cc:>8.1f}"
         )
     lines.append("")
     lines.append("=" * w)
@@ -109,7 +109,7 @@ def render_html_report(
     rows_html = ""
     for r in result.regions:
         rows_html += (
-            f"<tr><td>{r.label}</td><td>{r.mean_uptake:.4f}</td>"
+            f"<tr><td>{r.label}</td><td>{r.suvr:.3f}</td><td>{r.mean_uptake:.4f}</td>"
             f"<td>{r.std_uptake:.4f}</td><td>{r.voxel_count}</td>"
             f"<td>{r.volume_cc:.1f}</td></tr>\n"
         )
@@ -261,7 +261,7 @@ def render_html_report(
         <h2>Regional Uptake Values</h2>
         <table class="regions">
             <thead>
-                <tr><th>Region</th><th>Mean</th><th>SD</th><th>Voxels</th><th>Vol (mL)</th></tr>
+                <tr><th>Region</th><th>SUVr</th><th>Mean</th><th>SD</th><th>Voxels</th><th>Vol (mL)</th></tr>
             </thead>
             <tbody>
                 {rows_html}
