@@ -7,7 +7,7 @@ from typing import Optional
 
 from .centiloid import CentiloidResult, RegionResult
 from .dicom_loader import DicomSeriesInfo
-from .atlas import get_voi_status, is_using_official_voi
+from .atlas import REFERENCE_REGION_KEYS, get_voi_status, is_using_official_voi
 
 
 # ---------------------------------------------------------------------------
@@ -62,6 +62,24 @@ def render_text_report(
         lines.append(f"  ⚠ {result.confidence_note}")
         lines.append("")
 
+    reference_lines = []
+    if result.ref_mean > 0:
+        regions_by_key = {region.name: region for region in result.regions}
+        for key in REFERENCE_REGION_KEYS:
+            region = regions_by_key.get(key)
+            if region is None:
+                continue
+            suvr = region.mean_uptake / result.ref_mean
+            reference_lines.append(f"  {region.label:<32} {suvr:>6.3f}")
+    if reference_lines:
+        lines.append("-" * w)
+        lines.append("  REFERENCE REGION SUVR")
+        lines.append("-" * w)
+        lines.append(f"  {'Region':<32} {'SUVr':>6}")
+        lines.append(f"  {'-'*32} {'-'*6}")
+        lines.extend(reference_lines)
+        lines.append("")
+
     lines.append("-" * w)
     lines.append("  REGIONAL UPTAKE VALUES")
     lines.append("-" * w)
@@ -113,6 +131,34 @@ def render_html_report(
             f"<td>{r.std_uptake:.4f}</td><td>{r.voxel_count}</td>"
             f"<td>{r.volume_cc:.1f}</td></tr>\n"
         )
+
+    reference_rows = ""
+    if result.ref_mean > 0:
+        regions_by_key = {region.name: region for region in result.regions}
+        for key in REFERENCE_REGION_KEYS:
+            region = regions_by_key.get(key)
+            if region is None:
+                continue
+            suvr = region.mean_uptake / result.ref_mean
+            reference_rows += (
+                f"<tr><td>{region.label}</td><td>{suvr:.3f}</td></tr>\n"
+            )
+
+    reference_section = ""
+    if reference_rows:
+        reference_section = f"""
+    <div class="section">
+        <h2>Reference Region SUVr</h2>
+        <table class="regions">
+            <thead>
+                <tr><th>Region</th><th>SUVr</th></tr>
+            </thead>
+            <tbody>
+                {reference_rows}
+            </tbody>
+        </table>
+    </div>
+        """
 
     patient_html = ""
     if info:
@@ -268,6 +314,8 @@ def render_html_report(
             </tbody>
         </table>
     </div>
+
+    {reference_section}
 
     <div class="footer">
         <p>Centiloid scale: 0 = young-control mean, 100 = typical-AD mean</p>

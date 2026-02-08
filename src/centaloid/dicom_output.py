@@ -31,6 +31,7 @@ except ImportError:
     PIL_AVAILABLE = False
 
 from .centiloid import CentiloidResult
+from .atlas import REFERENCE_REGION_KEYS
 from .dicom_loader import DicomSeriesInfo
 
 logger = logging.getLogger(__name__)
@@ -42,6 +43,26 @@ IMPLEMENTATION_VERSION = "CENTALOID_1.0"
 
 # Series description prefix
 SERIES_DESC_PREFIX = "Centiloid Analysis"
+
+
+def _reference_suvr_values(result: CentiloidResult) -> list[tuple[str, float]]:
+    """Return (label, suvr) entries for reference regions."""
+    if result.ref_mean <= 0:
+        return []
+    regions_by_key = {region.name: region for region in result.regions}
+    values: list[tuple[str, float]] = []
+    for key in REFERENCE_REGION_KEYS:
+        region = regions_by_key.get(key)
+        if region is None:
+            continue
+        values.append((region.label, region.mean_uptake / result.ref_mean))
+    return values
+
+
+def _format_reference_suvr(result: CentiloidResult) -> str:
+    """Format reference-region SUVr values for display."""
+    parts = [f"{label} SUVr={suvr:.4f}" for label, suvr in _reference_suvr_values(result)]
+    return ", ".join(parts)
 
 
 def _generate_series_instance_uid() -> str:
@@ -172,12 +193,16 @@ def create_dicom_secondary_capture(
 
     # Add Centiloid-specific private tags or use Content Sequence
     # Using standard tags where possible
-    ds.ImageComments = (
-        f"Centiloid={result.centiloid:.1f} CL, "
-        f"SUVr={result.suvr:.4f}, "
-        f"Tracer={result.tracer}, "
-        f"Classification={result.classification}"
-    )
+    reference_suvr = _format_reference_suvr(result)
+    comment_parts = [
+        f"Centiloid={result.centiloid:.1f} CL",
+        f"SUVr={result.suvr:.4f}",
+        f"Tracer={result.tracer}",
+        f"Classification={result.classification}",
+    ]
+    if reference_suvr:
+        comment_parts.append(f"Reference SUVr: {reference_suvr}")
+    ds.ImageComments = ", ".join(comment_parts)
 
     # Save the file
     if output_path is None:
@@ -294,6 +319,13 @@ def create_dicom_structured_report(
         "SUVr (CTX/WC)", "ratio", result.suvr,
         code_value="126400", code_scheme="DCM"
     ))
+
+    # Add reference region SUVr values
+    for label, suvr in _reference_suvr_values(result):
+        content_sequence.append(_create_num_measurement(
+            f"SUVr ({label})", "ratio", suvr,
+            code_value="126400", code_scheme="DCM"
+        ))
 
     # Add tracer name as text
     content_sequence.append(_create_text_content(
@@ -441,10 +473,21 @@ def _render_result_image(
     y += 25
 
     for region in result.regions:
-        draw.text((40, y), f"{region.label}: mean={region.mean_uptake:.4f}, "
-                  f"voxels={region.voxel_count}, vol={region.volume_cc:.1f}mL",
-                  font=body_font, fill='black')
+        details = (
+            f"{region.label}: mean={region.mean_uptake:.4f}, "
+            f"voxels={region.voxel_count}, vol={region.volume_cc:.1f}mL"
+        )
+        draw.text((40, y), details, font=body_font, fill='black')
         y += 18
+
+    reference_suvr_lines = _reference_suvr_values(result)
+    if reference_suvr_lines:
+        y += 6
+        draw.text((20, y), "REFERENCE REGION SUVR", font=header_font, fill='darkblue')
+        y += 25
+        for label, suvr in reference_suvr_lines:
+            draw.text((40, y), f"{label}: SUVr={suvr:.4f}", font=body_font, fill='black')
+            y += 18
 
     y += 20
 
