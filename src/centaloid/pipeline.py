@@ -21,6 +21,7 @@ from .dicom_loader import PETVolume, load_dicom_directory, load_dicom_series
 from .registration import resample_to_mni, estimate_affine_to_mni, MNI_AFFINE
 from .centiloid import compute_centiloid, CentiloidResult
 from .report import render_text_report, render_html_report
+from .dicom_output import save_results_as_dicom
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,12 @@ class PipelineConfig:
     generate_html_report: bool = True
     generate_text_report: bool = True
 
+    generate_dicom_sc: bool = False
+    """Generate DICOM Secondary Capture image with results."""
+
+    generate_dicom_sr: bool = False
+    """Generate DICOM Structured Report with measurements."""
+
 
 # ---------------------------------------------------------------------------
 # Pipeline
@@ -74,6 +81,8 @@ class PipelineResult:
     centiloid_result: CentiloidResult
     text_report: str = ""
     html_report: str = ""
+    dicom_files: list = field(default_factory=list)
+    """Paths to generated DICOM output files (SC and/or SR)."""
 
 
 def run_pipeline(
@@ -155,6 +164,21 @@ def run_pipeline(
     if config.generate_html_report:
         html_report = render_html_report(cl_result, pet.info)
 
+    # 7. DICOM output ---------------------------------------------------------
+    dicom_files: list = []
+    if config.generate_dicom_sc or config.generate_dicom_sr:
+        _progress("Generating DICOM output…", 0.90)
+        out_dir = Path(config.output_dir) if config.output_dir else Path(".")
+        dicom_files = save_results_as_dicom(
+            cl_result,
+            source_info=pet.info,
+            output_dir=out_dir,
+            create_sc=config.generate_dicom_sc,
+            create_sr=config.generate_dicom_sr,
+        )
+        if dicom_files:
+            logger.info("DICOM files saved: %s", [str(f) for f in dicom_files])
+
     if config.output_dir:
         out = Path(config.output_dir)
         out.mkdir(parents=True, exist_ok=True)
@@ -173,4 +197,5 @@ def run_pipeline(
         centiloid_result=cl_result,
         text_report=text_report,
         html_report=html_report,
+        dicom_files=dicom_files,
     )

@@ -55,6 +55,10 @@ def main():
                        help="Skip SUV(bw) scaling")
     run_p.add_argument("--skip-registration", action="store_true",
                        help="Assume data is already in MNI space")
+    run_p.add_argument("--dicom-sc", action="store_true",
+                       help="Generate DICOM Secondary Capture image")
+    run_p.add_argument("--dicom-sr", action="store_true",
+                       help="Generate DICOM Structured Report")
     run_p.add_argument("--verbose", "-v", action="store_true")
 
     # --- 'tracers' sub-command ---
@@ -90,6 +94,8 @@ def main():
             apply_suv_scaling=not args.no_suv,
             skip_registration=args.skip_registration,
             output_dir=args.output,
+            generate_dicom_sc=args.dicom_sc,
+            generate_dicom_sr=args.dicom_sr,
         )
 
         def _progress(msg: str, frac: float):
@@ -113,6 +119,11 @@ def main():
 
         if args.output:
             print(f"\nReports saved to: {args.output}")
+
+        if result.dicom_files:
+            print(f"\nDICOM files created:")
+            for f in result.dicom_files:
+                print(f"  {f}")
 
 
 # ---------------------------------------------------------------------------
