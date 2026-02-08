@@ -33,6 +33,8 @@ class DicomSeriesInfo:
     study_date: str = ""
     study_description: str = ""
     series_description: str = ""
+    study_instance_uid: str = ""
+    series_instance_uid: str = ""
     modality: str = ""
     manufacturer: str = ""
     tracer_name: str = ""
@@ -284,6 +286,8 @@ def load_dicom_series(
         study_date=str(_safe_getattr(ref, "StudyDate", "")),
         study_description=str(_safe_getattr(ref, "StudyDescription", "")),
         series_description=str(_safe_getattr(ref, "SeriesDescription", "")),
+        study_instance_uid=str(_safe_getattr(ref, "StudyInstanceUID", "")),
+        series_instance_uid=str(_safe_getattr(ref, "SeriesInstanceUID", "")),
         modality=modality,
         manufacturer=str(_safe_getattr(ref, "Manufacturer", "")),
         tracer_name=_extract_tracer_name(ref),
