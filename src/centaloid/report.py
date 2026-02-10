@@ -63,15 +63,12 @@ def render_text_report(
         lines.append("")
 
     lines.append("-" * w)
-    lines.append("  REGIONAL UPTAKE VALUES")
+    lines.append("  REGIONAL SUVr VALUES")
     lines.append("-" * w)
-    lines.append(f"  {'Region':<32} {'SUVr':>6} {'Mean':>8} {'SD':>8} {'Voxels':>8} {'Vol(mL)':>8}")
-    lines.append(f"  {'-'*32} {'-'*6} {'-'*8} {'-'*8} {'-'*8} {'-'*8}")
+    lines.append(f"  {'Region':<40} {'SUVr':>10}")
+    lines.append(f"  {'-'*40} {'-'*10}")
     for r in result.regions:
-        lines.append(
-            f"  {r.label:<32} {r.suvr:>6.3f} {r.mean_uptake:>8.4f} "
-            f"{r.std_uptake:>8.4f} {r.voxel_count:>8d} {r.volume_cc:>8.1f}"
-        )
+        lines.append(f"  {r.label:<40} {r.suvr:>10.4f}")
     lines.append("")
     lines.append("=" * w)
     lines.append("  Centiloid scale: 0 = young-control mean, 100 = typical-AD mean")
@@ -108,11 +105,7 @@ def render_html_report(
 
     rows_html = ""
     for r in result.regions:
-        rows_html += (
-            f"<tr><td>{r.label}</td><td>{r.suvr:.3f}</td><td>{r.mean_uptake:.4f}</td>"
-            f"<td>{r.std_uptake:.4f}</td><td>{r.voxel_count}</td>"
-            f"<td>{r.volume_cc:.1f}</td></tr>\n"
-        )
+        rows_html += f"<tr><td>{r.label}</td><td>{r.suvr:.4f}</td></tr>\n"
 
     patient_html = ""
     if info:
@@ -258,10 +251,10 @@ def render_html_report(
     {patient_html}
 
     <div class="section">
-        <h2>Regional Uptake Values</h2>
+        <h2>Regional SUVr Values</h2>
         <table class="regions">
             <thead>
-                <tr><th>Region</th><th>SUVr</th><th>Mean</th><th>SD</th><th>Voxels</th><th>Vol (mL)</th></tr>
+                <tr><th>Region</th><th>SUVr</th></tr>
             </thead>
             <tbody>
                 {rows_html}
