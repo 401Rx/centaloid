@@ -46,6 +46,12 @@ except ImportError:
     sys.exit(1)
 
 try:
+    from scipy.ndimage import affine_transform
+except ImportError:
+    print("ERROR: scipy is required. Install with: pip install scipy")
+    sys.exit(1)
+
+try:
     import pandas as pd
     HAS_PANDAS = True
 except ImportError:
@@ -83,7 +89,42 @@ def load_nifti(path: Path) -> tuple[np.ndarray, np.ndarray]:
     """Load a NIfTI file and return (data, affine)."""
     img = nib.load(path)
     data = np.asarray(img.dataobj, dtype=np.float32)
+    # Handle 4D volumes (squeeze last dimension if size 1)
+    if data.ndim == 4 and data.shape[-1] == 1:
+        data = data[:, :, :, 0]
     return data, img.affine
+
+
+def resample_to_target(
+    source_data: np.ndarray,
+    source_affine: np.ndarray,
+    target_shape: tuple,
+    target_affine: np.ndarray,
+) -> np.ndarray:
+    """Resample source volume to target space using affine transformation."""
+    from scipy.ndimage import affine_transform
+
+    # Compute transformation from target voxels to source voxels
+    # target_vox -> world -> source_vox
+    target_to_world = target_affine
+    world_to_source = np.linalg.inv(source_affine)
+    target_to_source = world_to_source @ target_to_world
+
+    # Extract rotation/scale matrix and offset
+    matrix = target_to_source[:3, :3]
+    offset = target_to_source[:3, 3]
+
+    # Resample using trilinear interpolation
+    resampled = affine_transform(
+        source_data,
+        matrix,
+        offset=offset,
+        output_shape=target_shape,
+        order=1,  # trilinear
+        mode='constant',
+        cval=0.0,
+    )
+    return resampled
 
 
 def compute_roi_mean(volume: np.ndarray, mask: np.ndarray) -> float:
@@ -257,11 +298,14 @@ def validate_pipeline(
             print(f"  ERROR loading {filepath.name}: {e}")
             continue
 
-        # Check dimensions match VOI
+        # Check dimensions match VOI - if not, resample PET to VOI space
         if pet_data.shape != ctx_mask.shape:
-            # Need to resample VOI to match PET
-            warnings.warn(f"Shape mismatch: PET {pet_data.shape} vs VOI {ctx_mask.shape}")
-            # For GAAIN data, shapes should match (all 2mm MNI space)
+            print(f"  Resampling {subject_id} from {pet_data.shape} to {ctx_mask.shape}...", end=" ")
+            pet_data = resample_to_target(
+                pet_data, pet_affine,
+                ctx_mask.shape, ctx_affine
+            )
+            print("done")
 
         # Compute ROI means
         ctx_mean = compute_roi_mean(pet_data, ctx_mask)
