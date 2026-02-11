@@ -55,11 +55,24 @@ except ImportError:
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 try:
-    from centaloid.registration import resample_to_mni, MNI_AFFINE, MNI_SHAPE
+    from centaloid.pet_registration import (
+        register_pet_to_mni,
+        create_pet_template_from_masks,
+        MNI_AFFINE,
+        MNI_SHAPE,
+    )
+    HAS_PET_REGISTRATION = True
+except ImportError:
+    HAS_PET_REGISTRATION = False
+
+try:
+    from centaloid.registration import resample_to_mni
     HAS_REGISTRATION = True
 except ImportError:
     HAS_REGISTRATION = False
-    print("WARNING: centaloid.registration not available - using simple resampling")
+
+if not HAS_PET_REGISTRATION and not HAS_REGISTRATION:
+    print("WARNING: No registration module available - using simple resampling")
 
 try:
     import pandas as pd
@@ -268,6 +281,17 @@ def validate_pipeline(
     wc_voxels = int((wc_mask > 0).sum())
     print(f"CTX voxels: {ctx_voxels}")
     print(f"WC voxels:  {wc_voxels}")
+
+    # Create PET template from VOI masks for registration
+    pet_template = None
+    if HAS_PET_REGISTRATION:
+        print("Creating PET template from VOI masks for registration...")
+        pet_template = create_pet_template_from_masks(ctx_mask > 0, wc_mask > 0)
+        print("  Registration method: PET-specific (mutual information + COM init)")
+    elif HAS_REGISTRATION:
+        print("  Registration method: T1-based (may be less accurate for PET)")
+    else:
+        print("  Registration method: Affine only (requires MNI-aligned data)")
     print()
 
     # Find subject files
@@ -310,8 +334,17 @@ def validate_pipeline(
 
         # Check dimensions match VOI - if not, register PET to MNI space
         if pet_data.shape != ctx_mask.shape:
-            if HAS_REGISTRATION:
-                print(f"  Registering {subject_id} to MNI space...", end=" ", flush=True)
+            if HAS_PET_REGISTRATION:
+                print(f"  Registering {subject_id} (PET-specific)...", end=" ", flush=True)
+                pet_data, _ = register_pet_to_mni(
+                    pet_data, pet_affine,
+                    target_mask=pet_template,
+                    max_iter=150,
+                    use_mi=True
+                )
+                print("done")
+            elif HAS_REGISTRATION:
+                print(f"  Registering {subject_id} (T1-based)...", end=" ", flush=True)
                 pet_data, _ = resample_to_mni(pet_data, pet_affine)
                 print("done")
             else:
