@@ -56,6 +56,8 @@ CTX_VOI_NAMES = [
 ]
 
 WC_VOI_NAMES = [
+    "voi_WhlCbl_2mm.nii",      # Official GAAIN filename
+    "voi_WhlCbl_2mm.nii.gz",
     "voi_wc_2mm.nii",
     "voi_wc_2mm.nii.gz",
     "WC_VOI.nii",
