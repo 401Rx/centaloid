@@ -51,6 +51,16 @@ except ImportError:
     print("ERROR: scipy is required. Install with: pip install scipy")
     sys.exit(1)
 
+# Add parent path for centaloid imports
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+try:
+    from centaloid.registration import resample_to_mni, MNI_AFFINE, MNI_SHAPE
+    HAS_REGISTRATION = True
+except ImportError:
+    HAS_REGISTRATION = False
+    print("WARNING: centaloid.registration not available - using simple resampling")
+
 try:
     import pandas as pd
     HAS_PANDAS = True
@@ -298,14 +308,19 @@ def validate_pipeline(
             print(f"  ERROR loading {filepath.name}: {e}")
             continue
 
-        # Check dimensions match VOI - if not, resample PET to VOI space
+        # Check dimensions match VOI - if not, register PET to MNI space
         if pet_data.shape != ctx_mask.shape:
-            print(f"  Resampling {subject_id} from {pet_data.shape} to {ctx_mask.shape}...", end=" ")
-            pet_data = resample_to_target(
-                pet_data, pet_affine,
-                ctx_mask.shape, ctx_affine
-            )
-            print("done")
+            if HAS_REGISTRATION:
+                print(f"  Registering {subject_id} to MNI space...", end=" ", flush=True)
+                pet_data, _ = resample_to_mni(pet_data, pet_affine)
+                print("done")
+            else:
+                print(f"  Resampling {subject_id} (affine only)...", end=" ", flush=True)
+                pet_data = resample_to_target(
+                    pet_data, pet_affine,
+                    ctx_mask.shape, ctx_affine
+                )
+                print("done")
 
         # Compute ROI means
         ctx_mean = compute_roi_mean(pet_data, ctx_mask)
