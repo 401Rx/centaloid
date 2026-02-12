@@ -179,13 +179,22 @@ def params_to_affine(params: np.ndarray) -> np.ndarray:
     return M
 
 
-def downsample_volume(volume: np.ndarray, factor: int) -> np.ndarray:
-    """Downsample volume by given factor."""
+def downsample_volume(volume: np.ndarray, factor: int, target_shape: tuple = None) -> np.ndarray:
+    """Downsample volume by given factor.
+
+    If target_shape is provided, ensures output matches that shape exactly.
+    """
     if factor == 1:
         return volume
     sigma = factor / 2.0
     smoothed = gaussian_filter(volume.astype(np.float64), sigma=sigma)
-    return zoom(smoothed, 1.0 / factor, order=1)
+
+    if target_shape is not None:
+        # Use zoom factors that produce exact target shape
+        zoom_factors = [t / s for t, s in zip(target_shape, volume.shape)]
+        return zoom(smoothed, zoom_factors, order=1)
+    else:
+        return zoom(smoothed, 1.0 / factor, order=1)
 
 
 def create_mni_brain_template() -> np.ndarray:
@@ -327,16 +336,23 @@ def register_pet_robust(
 
         # Resample source to target space
         if resolution > 1:
-            target_shape_ds = tuple(s // resolution for s in target_norm.shape)
-            source_ds = downsample_volume(source_norm, resolution)
-            target_ds = downsample_volume(target_norm, resolution)
+            # Compute target downsampled shape (must be consistent)
+            target_shape_ds = tuple(max(1, s // resolution) for s in target_norm.shape)
+
+            # Downsample both volumes to exact same shape
+            target_ds = downsample_volume(target_norm, resolution, target_shape=target_shape_ds)
+
+            # For source, we resample it to target space with the transformation
+            # So we don't downsample source separately - we apply transform and output
+            # at the downsampled target resolution
 
             # Adjust transformation for downsampled space
             scale_mat = np.diag([resolution, resolution, resolution, 1.0])
             inv_combined_ds = scale_mat @ inv_combined @ np.linalg.inv(scale_mat)
 
+            # Resample source directly to downsampled target shape
             resampled = affine_transform(
-                source_ds,
+                source_norm,  # Use full resolution source
                 inv_combined_ds[0:3, 0:3],
                 offset=inv_combined_ds[0:3, 3],
                 output_shape=target_shape_ds,
