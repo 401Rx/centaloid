@@ -55,11 +55,20 @@ except ImportError:
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 try:
+    from centaloid.robust_registration import (
+        register_pet_to_mni_robust,
+        create_amyloid_pet_template,
+        MNI_AFFINE,
+        MNI_SHAPE,
+    )
+    HAS_ROBUST_REGISTRATION = True
+except ImportError:
+    HAS_ROBUST_REGISTRATION = False
+
+try:
     from centaloid.pet_registration import (
         register_pet_to_mni,
         create_pet_template_from_masks,
-        MNI_AFFINE,
-        MNI_SHAPE,
     )
     HAS_PET_REGISTRATION = True
 except ImportError:
@@ -71,7 +80,7 @@ try:
 except ImportError:
     HAS_REGISTRATION = False
 
-if not HAS_PET_REGISTRATION and not HAS_REGISTRATION:
+if not HAS_ROBUST_REGISTRATION and not HAS_PET_REGISTRATION and not HAS_REGISTRATION:
     print("WARNING: No registration module available - using simple resampling")
 
 try:
@@ -284,7 +293,11 @@ def validate_pipeline(
 
     # Create PET template from VOI masks for registration
     pet_template = None
-    if HAS_PET_REGISTRATION:
+    if HAS_ROBUST_REGISTRATION:
+        print("Creating amyloid PET template for registration...")
+        pet_template = create_amyloid_pet_template(ctx_mask > 0, wc_mask > 0)
+        print("  Registration method: Robust multi-resolution (NMI + restarts)")
+    elif HAS_PET_REGISTRATION:
         print("Creating PET template from VOI masks for registration...")
         pet_template = create_pet_template_from_masks(ctx_mask > 0, wc_mask > 0)
         print("  Registration method: PET-specific (mutual information + COM init)")
@@ -334,7 +347,16 @@ def validate_pipeline(
 
         # Check dimensions match VOI - if not, register PET to MNI space
         if pet_data.shape != ctx_mask.shape:
-            if HAS_PET_REGISTRATION:
+            if HAS_ROBUST_REGISTRATION:
+                print(f"  Registering {subject_id} (robust)...", end=" ", flush=True)
+                pet_data, _ = register_pet_to_mni_robust(
+                    pet_data, pet_affine,
+                    ctx_mask=ctx_mask > 0,
+                    wc_mask=wc_mask > 0,
+                    max_iter=200,
+                )
+                print("done")
+            elif HAS_PET_REGISTRATION:
                 print(f"  Registering {subject_id} (PET-specific)...", end=" ", flush=True)
                 pet_data, _ = register_pet_to_mni(
                     pet_data, pet_affine,
