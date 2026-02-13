@@ -399,45 +399,61 @@ def validate_pipeline(
 
         # Check dimensions match VOI - if not, resample or register PET to MNI space
         if pet_data.shape != ctx_mask.shape:
-            # First, check if data is already MNI-aligned (just needs resampling)
-            # or if force_resample is enabled
-            if force_resample or is_mni_aligned(pet_affine):
-                method = "forced" if force_resample else "MNI-aligned"
-                print(f"  Resampling {subject_id} ({method})...", end=" ", flush=True)
+            needs_registration = True
+
+            # First try simple resampling if affine looks MNI-aligned
+            if not force_resample and is_mni_aligned(pet_affine):
+                print(f"  Trying resample for {subject_id}...", end=" ", flush=True)
+                resampled = resample_to_target(
+                    pet_data, pet_affine,
+                    ctx_mask.shape, ctx_affine
+                )
+                # Check if resampling worked by testing signal in cerebellum (WC)
+                wc_vals = resampled[wc_mask > 0]
+                wc_signal = wc_vals[wc_vals > 0].mean() if (wc_vals > 0).sum() > 100 else 0
+
+                if wc_signal > 0.1:  # Has meaningful signal in cerebellum
+                    print(f"OK (WC={wc_signal:.2f})")
+                    pet_data = resampled
+                    needs_registration = False
+                else:
+                    print(f"failed (WC={wc_signal:.2f}), will register")
+
+            if force_resample:
+                print(f"  Resampling {subject_id} (forced)...", end=" ", flush=True)
                 pet_data = resample_to_target(
                     pet_data, pet_affine,
                     ctx_mask.shape, ctx_affine
                 )
                 print("done")
-            elif HAS_ROBUST_REGISTRATION:
-                print(f"  Registering {subject_id} (robust)...", end=" ", flush=True)
-                pet_data, _ = register_pet_to_mni_robust(
-                    pet_data, pet_affine,
-                    ctx_mask=ctx_mask > 0,
-                    wc_mask=wc_mask > 0,
-                    max_iter=200,
-                )
-                print("done")
-            elif HAS_PET_REGISTRATION:
-                print(f"  Registering {subject_id} (PET-specific)...", end=" ", flush=True)
-                pet_data, _ = register_pet_to_mni(
-                    pet_data, pet_affine,
-                    target_mask=pet_template,
-                    max_iter=150,
-                    use_mi=True
-                )
-                print("done")
-            elif HAS_REGISTRATION:
-                print(f"  Registering {subject_id} (T1-based)...", end=" ", flush=True)
-                pet_data, _ = resample_to_mni(pet_data, pet_affine)
-                print("done")
-            else:
-                print(f"  Resampling {subject_id} (affine only)...", end=" ", flush=True)
-                pet_data = resample_to_target(
-                    pet_data, pet_affine,
-                    ctx_mask.shape, ctx_affine
-                )
-                print("done")
+                needs_registration = False
+
+            # Fall back to registration if resampling didn't work
+            if needs_registration:
+                if HAS_ROBUST_REGISTRATION:
+                    print(f"  Registering {subject_id} (robust)...", end=" ", flush=True)
+                    pet_data, _ = register_pet_to_mni_robust(
+                        pet_data, pet_affine,
+                        ctx_mask=ctx_mask > 0,
+                        wc_mask=wc_mask > 0,
+                        max_iter=200,
+                    )
+                    print("done")
+                elif HAS_PET_REGISTRATION:
+                    print(f"  Registering {subject_id} (PET-specific)...", end=" ", flush=True)
+                    pet_data, _ = register_pet_to_mni(
+                        pet_data, pet_affine,
+                        target_mask=pet_template,
+                        max_iter=150,
+                        use_mi=True
+                    )
+                    print("done")
+                elif HAS_REGISTRATION:
+                    print(f"  Registering {subject_id} (T1-based)...", end=" ", flush=True)
+                    pet_data, _ = resample_to_mni(pet_data, pet_affine)
+                    print("done")
+                else:
+                    print(f"  WARNING: {subject_id} needs registration but no registration module available")
 
         # Compute ROI means
         ctx_mean = compute_roi_mean(pet_data, ctx_mask)
