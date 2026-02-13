@@ -127,6 +127,47 @@ def load_nifti(path: Path) -> tuple[np.ndarray, np.ndarray]:
     return data, img.affine
 
 
+def is_mni_aligned(affine: np.ndarray, tolerance: float = 0.5) -> bool:
+    """Check if an affine matrix is approximately MNI-aligned.
+
+    MNI space characteristics:
+    - Approximately diagonal matrix (no rotation)
+    - Voxel size around 1-3mm
+    - Origin approximately at MNI origin
+
+    Returns True if the volume appears to already be in MNI space.
+    """
+    # Check for approximately diagonal matrix (no significant rotation)
+    rotation = affine[:3, :3]
+
+    # Get voxel sizes (diagonal elements)
+    voxel_sizes = np.abs(np.diag(rotation))
+
+    # Check off-diagonal elements are small (< tolerance)
+    off_diag = np.array([
+        rotation[0, 1], rotation[0, 2],
+        rotation[1, 0], rotation[1, 2],
+        rotation[2, 0], rotation[2, 1]
+    ])
+
+    is_diagonal = np.all(np.abs(off_diag) < tolerance)
+
+    # Check voxel sizes are reasonable for MNI (1-3mm typical)
+    reasonable_voxels = np.all((voxel_sizes >= 0.5) & (voxel_sizes <= 4.0))
+
+    # Check origin is approximately in MNI range
+    # MNI origin is around (90, -126, -72) for 2mm, give or take
+    origin = affine[:3, 3]
+    # Just check it's in a reasonable range
+    reasonable_origin = (
+        -150 < origin[0] < 150 and
+        -200 < origin[1] < 50 and
+        -150 < origin[2] < 100
+    )
+
+    return is_diagonal and reasonable_voxels and reasonable_origin
+
+
 def resample_to_target(
     source_data: np.ndarray,
     source_affine: np.ndarray,
@@ -250,6 +291,8 @@ def load_expected_values(excel_path: Path) -> dict[str, tuple[float, float]]:
 def validate_pipeline(
     data_dir: Path,
     output_path: Optional[Path] = None,
+    verbose: bool = False,
+    force_resample: bool = False,
 ) -> list[SubjectResult]:
     """Run validation on all subjects in data_dir."""
 
@@ -257,6 +300,8 @@ def validate_pipeline(
     print("GAAIN PiB Centiloid Validation")
     print("=" * 70)
     print(f"Data directory: {data_dir}")
+    if force_resample:
+        print("Mode: Force resample (skip registration)")
     print()
 
     # Find VOI files
@@ -345,9 +390,26 @@ def validate_pipeline(
             print(f"  ERROR loading {filepath.name}: {e}")
             continue
 
-        # Check dimensions match VOI - if not, register PET to MNI space
+        # Print verbose info about the file
+        if verbose:
+            voxel_sizes = np.abs(np.diag(pet_affine[:3, :3]))
+            mni_aligned = is_mni_aligned(pet_affine)
+            print(f"  {subject_id}: shape={pet_data.shape}, voxel={voxel_sizes}, MNI={mni_aligned}")
+            print(f"    Intensity range: [{pet_data.min():.2f}, {pet_data.max():.2f}]")
+
+        # Check dimensions match VOI - if not, resample or register PET to MNI space
         if pet_data.shape != ctx_mask.shape:
-            if HAS_ROBUST_REGISTRATION:
+            # First, check if data is already MNI-aligned (just needs resampling)
+            # or if force_resample is enabled
+            if force_resample or is_mni_aligned(pet_affine):
+                method = "forced" if force_resample else "MNI-aligned"
+                print(f"  Resampling {subject_id} ({method})...", end=" ", flush=True)
+                pet_data = resample_to_target(
+                    pet_data, pet_affine,
+                    ctx_mask.shape, ctx_affine
+                )
+                print("done")
+            elif HAS_ROBUST_REGISTRATION:
                 print(f"  Registering {subject_id} (robust)...", end=" ", flush=True)
                 pet_data, _ = register_pet_to_mni_robust(
                     pet_data, pet_affine,
@@ -511,6 +573,16 @@ def main():
         default=None,
         help="Output CSV file for results"
     )
+    parser.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Print detailed info about each file"
+    )
+    parser.add_argument(
+        "--force-resample",
+        action="store_true",
+        help="Force use of simple resampling (skip registration)"
+    )
 
     args = parser.parse_args()
 
@@ -518,7 +590,7 @@ def main():
         print(f"ERROR: Directory not found: {args.data_dir}")
         sys.exit(1)
 
-    validate_pipeline(args.data_dir, args.output)
+    validate_pipeline(args.data_dir, args.output, args.verbose, args.force_resample)
 
 
 if __name__ == "__main__":
